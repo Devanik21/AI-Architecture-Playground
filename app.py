@@ -637,7 +637,7 @@ def display_architecture_info(architecture):
     }
     
     info = arch_info.get(architecture, {})
-    return f"{info.get('emoji', '🤖')} **{architecture}**\n\n{info.get('description', 'Neural network architecture')}"
+    return f"{info.get('emoji', '🌊')} **{architecture}**\n\n{info.get('description', 'Neural network architecture')}"
 
 def main():
     # Main title with custom styling
@@ -875,19 +875,19 @@ def main():
                 st.markdown(f"**📦 Batch Size:** `{batch_size}`")
                 
                 if st.session_state.trained_models:
-                    st.markdown("### 🤖 Trained Models")
+                    st.markdown("### 🌊 Trained Models")
                     for i, model_name in enumerate(st.session_state.trained_models.keys()):
                         status_color = ["#00ff88", "#00d4ff", "#7c3aed", "#ff6b35", "#ff1b6b"][i % 5]
                         st.markdown(f'<span class="status-indicator" style="background-color: {status_color};"></span> **{model_name}**', unsafe_allow_html=True)
     
     with tab3:
-        st.markdown("## 🤖 Neural Q&A Testing Interface")
+        st.markdown("## 🌊 Neural Q&A Testing Interface")
         st.markdown("*Query your trained artificial intelligence*")
         
         if not st.session_state.trained_models:
             st.markdown("""
             <div style="text-align: center; padding: 3rem; background: linear-gradient(135deg, rgba(255, 107, 53, 0.1), rgba(255, 27, 107, 0.1)); border-radius: 15px; border: 2px dashed #ff6b35;">
-                <h3 style="color: #ff6b35;">🤖 Neural Models Required</h3>
+                <h3 style="color: #ff6b35;">🌊 Neural Models Required</h3>
                 <p style="color: #a0a9c0;">Please train a neural model first to begin testing!</p>
             </div>
             """, unsafe_allow_html=True)
