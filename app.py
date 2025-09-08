@@ -705,15 +705,17 @@ def main():
 # ... inside tab3, inside the "Get Answer" button logic
 
                 # Get prediction
+                # Get prediction
                 model.eval()
                 with torch.no_grad():
-                    # CORRECTED: Unpack the tuple from the MoE model
+                    # Check if the model is MoE and unpack its tuple output
                     if isinstance(model, RobustMixtureOfExperts):
                         output, gate_weights = model(question_tensor, training=False)
                     else:
+                        # For all other models, get the single tensor output
                         output = model(question_tensor)
                     
-                    # This will now work because 'output' is a tensor
+                    # Now, 'output' is guaranteed to be a tensor, so this will work
                     predicted_class = output.argmax(dim=1).item()
 #
                     confidence = torch.softmax(output, dim=1).max().item()
