@@ -279,9 +279,9 @@ def main():
         ["Mixture of Experts (MoE)", "Simple Transformer", "CNN", "LSTM", "MLP"]
     )
     
-    hidden_dim = st.sidebar.slider("Hidden Dimension", 32, 512, 128)
-    epochs = st.sidebar.slider("Training Epochs", 5, 50, 10)
-    batch_size = st.sidebar.slider("Batch Size", 8, 64, 16)
+    hidden_dim = st.sidebar.slider("Hidden Dimension", 32, 2048, 128)
+    epochs = st.sidebar.slider("Training Epochs", 5, 5000, 10)
+    batch_size = st.sidebar.slider("Batch Size", 4, 256, 4)
     
     # Initialize session state
     if 'trained_models' not in st.session_state:
