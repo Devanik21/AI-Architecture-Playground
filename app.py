@@ -699,14 +699,21 @@ def main():
                 question_tensor = torch.FloatTensor(question_features)
                 
                 # Get prediction
+                #
+# ... inside tab3, inside the "Get Answer" button logic
+
+                # Get prediction
                 model.eval()
                 with torch.no_grad():
+                    # CORRECTED: Unpack the tuple from the MoE model
                     if isinstance(model, RobustMixtureOfExperts):
                         output, gate_weights = model(question_tensor, training=False)
                     else:
                         output = model(question_tensor)
                     
+                    # This will now work because 'output' is a tensor
                     predicted_class = output.argmax(dim=1).item()
+#
                     confidence = torch.softmax(output, dim=1).max().item()
                 
                 # Find similar content
