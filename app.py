@@ -18,7 +18,7 @@ warnings.filterwarnings('ignore')
 
 # Set page config with dark theme
 st.set_page_config(
-    page_title="🚀 ML Architecture Playground", 
+    page_title=" ML Architecture Playground", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -585,7 +585,7 @@ def plot_training_curves(train_losses, val_losses):
     
     ax.set_xlabel('Epoch', color='#ffffff', fontsize=12)
     ax.set_ylabel('Loss', color='#ffffff', fontsize=12)
-    ax.set_title('🚀 Training Progress', color='#00d4ff', fontsize=16, fontweight='bold')
+    ax.set_title('✨ Training Progress', color='#00d4ff', fontsize=16, fontweight='bold')
     
     # Customize legend
     legend = ax.legend(facecolor='#252b42', edgecolor='#00d4ff')
@@ -640,7 +640,7 @@ def display_architecture_info(architecture):
 
 def main():
     # Main title with custom styling
-    st.markdown('<h1 class="main-title">🚀 ML ARCHITECTURE PLAYGROUND</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-title">✨ ML ARCHITECTURE PLAYGROUND</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitle">🌌 Upload PDFs • Train Neural Networks • Test Intelligence 🌌</p>', unsafe_allow_html=True)
     
     # Add neural network decoration
@@ -700,7 +700,7 @@ def main():
         st.markdown("*Transform your documents into neural training data*")
         
         uploaded_files = st.file_uploader(
-            "🚀 Choose PDF files for neural training",
+            "✨ Choose PDF files for neural training",
             type="pdf",
             accept_multiple_files=True,
             help="Upload one or multiple PDF files to create training data"
@@ -772,14 +772,14 @@ def main():
             with col1:
                 st.markdown(f"""
                 <div class="architecture-card">
-                    <h4 style="color: #00d4ff;">🚀 Ready for Neural Training</h4>
+                    <h4 style="color: #00d4ff;">✨ Ready for Neural Training</h4>
                     <p><strong>Architecture:</strong> <span style="color: #00ff88;">{architecture}</span></p>
                     <p><strong>Training Samples:</strong> <span style="color: #00ff88;">{len(st.session_state.qa_data)}</span></p>
                     <p><strong>Status:</strong> <span class="status-indicator status-ready"></span>Ready to train</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                if st.button("🚀 Initialize Neural Training", type="primary"):
+                if st.button("✨ Initialize Neural Training", type="primary"):
                     with st.spinner("🧠 Training neural pathways..."):
                         # Prepare data
                         texts = [qa['answer'] for qa in st.session_state.qa_data]
@@ -902,7 +902,7 @@ def main():
             # Display model info
             st.markdown(f"""
             <div class="architecture-card">
-                <h4 style="color: #00d4ff;">🚀 Active Neural Model</h4>
+                <h4 style="color: #00d4ff;">✨ Active Neural Model</h4>
                 <p>{display_architecture_info(test_model)}</p>
                 <p><strong>Status:</strong> <span class="status-indicator status-success"></span>Ready for inference</p>
             </div>
@@ -919,7 +919,7 @@ def main():
             col1, col2 = st.columns([3, 1])
             
             with col1:
-                if question and st.button("🚀 Generate Neural Response", type="primary"):
+                if question and st.button("✨ Generate Neural Response", type="primary"):
                     model = st.session_state.trained_models[test_model]
                     vectorizer = st.session_state.vectorizers[test_model]
                     
