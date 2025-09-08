@@ -19,6 +19,7 @@ warnings.filterwarnings('ignore')
 # Set page config with dark theme
 st.set_page_config(
     page_title=" ML Architecture Playground", 
+    page_icon="♾️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
