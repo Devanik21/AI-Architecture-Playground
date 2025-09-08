@@ -345,10 +345,21 @@ def main():
                         texts = [qa['answer'] for qa in st.session_state.qa_data]
                         labels = [qa['label'] for qa in st.session_state.qa_data]
                         
+                        # --- FIX STARTS HERE ---
+                        # Add a check to ensure there's enough data for a split.
+                        # We need at least a few samples to create a training and validation set.
+                        if len(texts) < 5: # Setting a minimum of 5 samples
+                            st.error(f"Not enough data to train. You only have {len(texts)} samples, but at least 5 are required. Please upload a larger or more text-rich PDF.")
+                            st.stop() # Stop execution if data is insufficient
+                        # --- FIX ENDS HERE ---
+                        
                         # Create dataset
                         train_texts, val_texts, train_labels, val_labels = train_test_split(
                             texts, labels, test_size=0.2, random_state=42
                         )
+                        
+                        train_dataset = TextDataset(train_texts, train_labels)
+                        val_dataset = TextDataset(val_texts, val_labels, train_dataset.vectorizer)
                         
                         train_dataset = TextDataset(train_texts, train_labels)
                         val_dataset = TextDataset(val_texts, val_labels, train_dataset.vectorizer)
