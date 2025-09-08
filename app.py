@@ -360,14 +360,20 @@ def train_robust_model(model, train_loader, val_loader, epochs=30):
     # ^^================================================================^^
 
     # Different learning rates for different parts
-    gate_params = list(model.gating.parameters()) + [model.temperature]
-    gate_param_ids = {id(p) for p in gate_params}
-    expert_params = [p for p in model.parameters() if id(p) not in gate_param_ids]
-    
-    optimizer = optim.AdamW([
-        {'params': expert_params, 'lr': 0.001, 'weight_decay': 0.01},
-        {'params': gate_params, 'lr': 0.002, 'weight_decay': 0.005}
-    ])
+    # Universal optimizer setup
+    if isinstance(model, RobustMixtureOfExperts):
+        # Specific optimizer for MoE with different learning rates
+        gate_params = list(model.gating.parameters()) + [model.temperature]
+        gate_param_ids = {id(p) for p in gate_params}
+        expert_params = [p for p in model.parameters() if id(p) not in gate_param_ids]
+        
+        optimizer = optim.AdamW([
+            {'params': expert_params, 'lr': 0.001, 'weight_decay': 0.01},
+            {'params': gate_params, 'lr': 0.002, 'weight_decay': 0.005}
+        ])
+    else:
+        # Standard optimizer for all other models
+        optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
     
     # ... (the rest of the function continues from here)
     
@@ -643,12 +649,8 @@ def main():
                             model = MLPModel(input_dim, hidden_dim, output_dim)
                         
                         # Train model
-                        if architecture == "Mixture of Experts (MoE)":
-                            train_losses, val_losses, val_accuracies = train_robust_model(model, train_loader, val_loader, epochs)
-                        else:
-                            # Use original training for other models
-                            train_losses, val_losses = train_model_simple(model, train_loader, val_loader, epochs)
-                            val_accuracies = None
+                        # Train model
+                        train_losses, val_losses, val_accuracies = train_robust_model(model, train_loader, val_loader, epochs)
                         
                         # Store trained model
                         st.session_state.trained_models[architecture] = model
