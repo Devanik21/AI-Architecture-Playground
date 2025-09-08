@@ -310,14 +310,21 @@ def main():
                     
                     if all_text:
                         processed_text = preprocess_text(all_text)
+                        
+                        # Check if we have enough text
+                        if len(processed_text) < 100:
+                            st.warning("PDF content seems too short. Please upload a larger PDF or multiple PDFs.")
+                            return
+                        
                         qa_pairs = create_qa_pairs(processed_text)
                         st.session_state.qa_data = qa_pairs
                         
                         st.success(f"Processed {len(qa_pairs)} text chunks for training")
+                        st.info(f"Text length: {len(processed_text)} characters")
                         
                         # Show sample data
                         if qa_pairs:
-                            st.subheader("Sample Data")
+                            st.subheader("Sample Training Data")
                             sample_df = pd.DataFrame(qa_pairs[:5])
                             st.dataframe(sample_df)
     
