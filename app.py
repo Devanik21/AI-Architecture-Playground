@@ -337,32 +337,26 @@ def create_robust_qa_pairs(text, chunk_size=300):
     
     return qa_pairs
 
+#
 def train_robust_model(model, train_loader, val_loader, epochs=30):
     """Enhanced training with proper loss functions and regularization"""
     
-    # Label smoothing cross entropy for better calibration
-    class LabelSmoothingCrossEntropy(nn.Module):
-        def __init__(self, smoothing=0.1):
-            super().__init__()
-            self.smoothing = smoothing
-        
-        def forward(self, pred, target):
-            n_class = pred.size(1)
-            one_hot = torch.zeros_like(pred).scatter(1, target.unsqueeze(1), 1)
-            one_hot = one_hot * (1 - self.smoothing) + self.smoothing / n_class
-            log_prob = F.log_softmax(pred, dim=1)
-            return -(one_hot * log_prob).sum(dim=1).mean()
-    
-    criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
-    
+    # ... (previous code in function) ...
+
     # Different learning rates for different parts
     gate_params = list(model.gating.parameters()) + [model.temperature]
-    expert_params = [p for p in model.parameters() if p not in gate_params]
+    # Create a set of IDs for fast lookup
+    gate_param_ids = {id(p) for p in gate_params} 
+    # Filter expert_params by checking if the parameter's ID is not in the gate_param_ids set
+    expert_params = [p for p in model.parameters() if id(p) not in gate_param_ids]
     
     optimizer = optim.AdamW([
         {'params': expert_params, 'lr': 0.001, 'weight_decay': 0.01},
         {'params': gate_params, 'lr': 0.002, 'weight_decay': 0.005}
     ])
+
+    # ... (rest of the function) ...
+#
     
     # Cosine annealing scheduler
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
