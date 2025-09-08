@@ -169,7 +169,12 @@ def preprocess_text(text):
     """Basic text preprocessing"""
     # Remove extra whitespace and special characters
     text = re.sub(r'\s+', ' ', text)
-    text = re.sub(r'[^\w\s]', '', text)
+    
+    # --- FIX IS HERE ---
+    # We'll keep periods by adding `.` to the regex
+    text = re.sub(r'[^\w\s.]', '', text) 
+    # --- END OF FIX ---
+    
     return text.lower().strip()
 
 def create_qa_pairs(text, chunk_size=200):
