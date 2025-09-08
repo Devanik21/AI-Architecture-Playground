@@ -678,9 +678,9 @@ def main():
         
         st.markdown("### ⚙️ Hyperparameters")
         
-        hidden_dim = st.slider("🔧 Hidden Dimension", 32, 512, 128, help="Size of hidden layers")
-        epochs = st.slider("🔄 Training Epochs", 5, 50, 10, help="Number of training iterations")
-        batch_size = st.slider("📦 Batch Size", 8, 64, 16, help="Samples per training batch")
+        hidden_dim = st.slider("🔧 Hidden Dimension", 32, 5096, 128, help="Size of hidden layers")
+        epochs = st.slider("🔄 Training Epochs", 5, 500, 10, help="Number of training iterations")
+        batch_size = st.slider("📦 Batch Size", 4, 256, 4, help="Samples per training batch")
         
         # Status indicators
         st.markdown("### 📊 System Status")
