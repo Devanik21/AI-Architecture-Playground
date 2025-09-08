@@ -700,35 +700,38 @@ def main():
                     question_features = vectorizer.scaler.transform(question_features)
                 question_tensor = torch.FloatTensor(question_features)
                 
-                # Get prediction
-                #
-# ... inside tab3, inside the "Get Answer" button logic
-
-                # Get prediction
-                # Get prediction
+                # --- START: ROBUST PREDICTION LOGIC ---
                 model.eval()
                 with torch.no_grad():
-                    # Check if the model is MoE and unpack its tuple output
-                    if isinstance(model, RobustMixtureOfExperts):
-                        output, gate_weights = model(question_tensor, training=False)
+                    # Define placeholder variables for clarity
+                    logits = None
+                    gate_weights = None
+
+                    # Step 1: Call the model and get its raw output
+                    raw_output = model(question_tensor, training=False)
+
+                    # Step 2: Check if the output is a tuple (from MoE)
+                    if isinstance(raw_output, tuple):
+                        # It's the MoE model; unpack the tuple
+                        logits = raw_output[0]
+                        gate_weights = raw_output[1]
                     else:
-                        # For all other models, get the single tensor output
-                        output = model(question_tensor)
+                        # It's any other model; the output is already the tensor we need
+                        logits = raw_output
                     
-                    # Now, 'output' is guaranteed to be a tensor, so this will work
-                    predicted_class = output.argmax(dim=1).item()
-#
-                    confidence = torch.softmax(output, dim=1).max().item()
+                    # Step 3: Now 'logits' is guaranteed to be a tensor.
+                    predicted_class = logits.argmax(dim=1).item()
+                    confidence = torch.softmax(logits, dim=1).max().item()
                 
-                # Find similar content
+                # Find similar content using the predicted class
                 relevant_qa = [qa for qa in st.session_state.qa_data if qa['label'] == predicted_class]
                 
                 if relevant_qa:
                     st.success(f"**Answer** (Confidence: {confidence:.3f}):")
                     st.write(relevant_qa[0]['answer'])
                     
-                    # Show expert usage for MoE
-                    if isinstance(model, RobustMixtureOfExperts):
+                    # Show expert usage for MoE, checking if gate_weights was assigned
+                    if gate_weights is not None:
                         st.subheader("Expert Utilization")
                         expert_weights = gate_weights[0].cpu().numpy()
                         expert_df = pd.DataFrame({
@@ -739,6 +742,7 @@ def main():
                         
                 else:
                     st.info("No relevant information found in the training data.")
+                # --- END: ROBUST PREDICTION LOGIC ---
             
             # Show some example questions
             if st.session_state.qa_data:
