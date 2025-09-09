@@ -764,37 +764,87 @@ def plot_training_curves(train_losses, val_losses):
     return fig
 
 def display_architecture_info(architecture):
-    """Display architecture information with styling"""
+    """Display architecture information with enhanced color and detail."""
     arch_info = {
+        "Hierarchical MoE (Advanced)": {
+            "emoji": "🌊",
+            "description": "A state-of-the-art design inspired by modern LLMs, using multi-level routers for intelligent task delegation.",
+            "color": "#ffc700",
+            "details": [
+                "🔀 **Hierarchical Routing:** Delegates tasks from a meta-router to specialized expert groups.",
+                "⚖️ **Load Balancing:** Actively prevents expert overuse, ensuring full model capacity is utilized.",
+                "🧱 **Residual Experts:** Each expert is a powerful residual block for stable, deep learning."
+            ]
+        },
         "Mixture of Experts (MoE)": {
             "emoji": "🧠",
-            "description": "Advanced ensemble of specialized neural networks with gating mechanism",
-            "color": "#7c3aed"
+            "description": "An advanced ensemble where a gating network routes data to the most suitable specialized neural network.",
+            "color": "#7c3aed",
+            "details": [
+                "🎯 **Specialization:** Encourages different experts to learn unique features of the data.",
+                "💡 **Efficient Inference:** Only a fraction of the model's parameters are used for any given input.",
+                "🧩 **Modular Design:** Easy to scale by adding more experts to the ensemble."
+            ]
         },
         "Simple Transformer": {
             "emoji": "⚡",
-            "description": "Attention-based model inspired by the Transformer architecture",
-            "color": "#00d4ff"
+            "description": "The foundational architecture of modern AI, using self-attention to weigh the importance of different input words.",
+            "color": "#00d4ff",
+            "details": [
+                "✨ **Self-Attention:** Captures long-range dependencies and contextual relationships.",
+                "🚀 **Parallelizable:** Processes all input tokens simultaneously, making it highly efficient on GPUs.",
+                "🌐 **Foundation of LLMs:** The core component behind models like GPT and BERT."
+            ]
         },
         "CNN": {
             "emoji": "🔍",
-            "description": "Convolutional Neural Network for pattern recognition",
-            "color": "#00ff88"
+            "description": "A powerful architecture for pattern recognition, ideal for finding spatial hierarchies in data, like features in text.",
+            "color": "#00ff88",
+            "details": [
+                "🖼️ **Feature Detection:** Uses learnable filters to automatically find patterns (e.g., n-grams).",
+                "ιε **Hierarchical Learning:** Builds complex patterns from simpler ones through stacked layers.",
+                "📍 **Translation Invariant:** Can detect a feature regardless of its position in the input."
+            ]
         },
         "LSTM": {
             "emoji": "🔄",
-            "description": "Long Short-Term Memory for sequential data processing",
-            "color": "#ff6b35"
+            "description": "A type of Recurrent Neural Network (RNN) with internal memory gates, designed to remember information over long sequences.",
+            "color": "#ff6b35",
+            "details": [
+                "💾 **Long-Term Memory:** Explicitly designed to prevent older signals from vanishing over time.",
+                "⛓️ **Sequential Processing:** Naturally handles data where order is critical, like time-series or text.",
+                " GATE **Gated Cell:** Uses 'forget', 'input', and 'output' gates to regulate information flow."
+            ]
         },
         "MLP": {
             "emoji": "🎯",
-            "description": "Multi-Layer Perceptron - Classic feedforward network",
-            "color": "#ff1b6b"
+            "description": "The classic Multi-Layer Perceptron. A fundamental feedforward neural network that acts as a universal function approximator.",
+            "color": "#ff1b6b",
+            "details": [
+                "🔧 **Universal Approximator:** Can learn to model any continuous function, given enough neurons.",
+                "🧱 **Building Block:** Forms the basis of many more complex deep learning architectures.",
+                "📈 **Non-Linearity:** Uses activation functions (like ReLU) to capture complex relationships."
+            ]
         }
     }
     
     info = arch_info.get(architecture, {})
-    return f"{info.get('emoji', '🌊')} **{architecture}**\n\n{info.get('description', 'Neural network architecture')}"
+    if not info:
+        return "🤖 **Unknown Architecture**\n\nNo details available."
+
+    # Create a detailed, formatted string using Markdown
+    details_markdown = "\n".join([f"- {item}" for item in info.get("details", [])])
+    
+    return f"""
+    {info.get('emoji', '🤖')} **{architecture}**
+
+    {info.get('description', 'No description available.')}
+    
+    ---
+    
+    **Key Features:**
+    {details_markdown}
+    """
 
 def main():
     # Main title with custom styling
