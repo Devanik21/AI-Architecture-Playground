@@ -357,21 +357,138 @@ class TextDataset(Dataset):
 # Mixture of Experts Model
 # Mixture of Experts Model
 class Expert(nn.Module):
-    """A deeper, more capable expert network."""
-    def __init__(self, input_dim, hidden_dim, output_dim):
+    """
+    An expert module implemented as a residual block for enhanced stability and performance.
+    """
+    def __init__(self, input_dim, hidden_dim, output_dim, dropout_rate=0.4):
         super(Expert, self).__init__()
-        self.network = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(hidden_dim, hidden_dim // 2),  # Additional hidden layer
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(hidden_dim // 2, output_dim)
-        )
-    
+        
+        # Network layers
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, output_dim)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(dropout_rate)
+        
+        # A projection layer is needed for the residual connection if input and hidden dimensions differ
+        self.projection = nn.Linear(input_dim, hidden_dim) if input_dim != hidden_dim else None
+
     def forward(self, x):
-        return self.network(x)
+        # The 'identity' is the original input, saved for the residual connection
+        identity = x
+        
+        # Forward pass through the main path
+        out = self.relu(self.fc1(x))
+        out = self.dropout(out)
+        out = self.fc2(out)
+        
+        # Project identity if dimensions don't match for the residual connection
+        if self.projection:
+            identity = self.projection(identity)
+        
+        # Add the residual connection (skip connection)
+        out += identity
+        out = self.relu(out)
+        
+        # Final layer
+        out = self.fc3(out)
+        return out
+
+
+class HierarchicalMixtureOfExperts(nn.Module):
+    """
+    An extremely powerful Hierarchical Mixture of Experts (H-MoE) model.
+    Features a 3-level structure with a meta-router and group-level routers,
+    and includes a load balancing auxiliary loss for stable and efficient training.
+    """
+    def __init__(self, input_dim, hidden_dim, output_dim, num_expert_groups=3, experts_per_group=4, top_k=2, load_balancing_alpha=0.01):
+        super(HierarchicalMixtureOfExperts, self).__init__()
+        self.num_expert_groups = num_expert_groups
+        self.experts_per_group = experts_per_group
+        self.top_k = top_k
+        self.load_balancing_alpha = load_balancing_alpha
+        
+        # Level 1: Meta-gating network to choose an expert group
+        self.meta_gating = nn.Linear(input_dim, self.num_expert_groups)
+        
+        # Level 2 & 3: Create groups, each with its own router and set of experts
+        self.expert_groups = nn.ModuleList()
+        for _ in range(self.num_expert_groups):
+            group_experts = nn.ModuleList([Expert(input_dim, hidden_dim, output_dim) for _ in range(self.experts_per_group)])
+            group_router = nn.Linear(input_dim, self.experts_per_group)
+            self.expert_groups.append(nn.ModuleDict({
+                'router': group_router,
+                'experts': group_experts,
+            }))
+
+    def _calculate_load_balancing_loss(self, router_logits):
+        """Calculates the auxiliary loss to encourage router to use all experts."""
+        router_probs = torch.softmax(router_logits, dim=1)
+        # Fraction of tokens dispatched to each expert
+        fraction_of_tokens = router_probs.mean(0)
+        # Mean probability for each expert
+        mean_prob = router_probs.mean(0)
+        # The loss encourages the product of these two to be constant, balancing the load
+        loss = self.load_balancing_alpha * router_logits.size(1) * torch.sum(fraction_of_tokens * mean_prob)
+        return loss
+
+    def forward(self, x):
+        batch_size = x.size(0)
+        
+        # --- Level 1: Meta-Routing ---
+        meta_logits = self.meta_gating(x)
+        # Choose the single best expert group for each token
+        _, top_group_indices = torch.topk(meta_logits, 1, dim=1)
+        top_group_indices = top_group_indices.squeeze(1)
+
+        # Calculate load balancing loss for the meta-router
+        total_aux_loss = self._calculate_load_balancing_loss(meta_logits)
+        
+        final_output = torch.zeros(batch_size, self.expert_groups[0]['experts'][0].fc3.out_features, device=x.device)
+
+        # --- Level 2 & 3: Group-level Routing and Expert Execution ---
+        for i in range(self.num_expert_groups):
+            # Find which tokens in the batch are assigned to this group
+            mask = (top_group_indices == i)
+            if not mask.any():
+                continue # Skip if no tokens are routed to this group
+
+            # Select the tokens for the current group
+            tokens_for_group = x[mask]
+            
+            # Get the group-specific router and experts
+            group = self.expert_groups[i]
+            group_router_logits = group['router'](tokens_for_group)
+            
+            # Calculate load balancing loss for this group's router
+            total_aux_loss += self._calculate_load_balancing_loss(group_router_logits)
+
+            # Perform Top-K routing within the group
+            top_k_weights, top_k_indices = torch.topk(group_router_logits, self.top_k, dim=1)
+            top_k_weights = nn.functional.softmax(top_k_weights, dim=1)
+            
+            group_output = torch.zeros_like(final_output[mask])
+            
+            # Get outputs from the top-k chosen experts
+            for k in range(self.top_k):
+                expert_indices = top_k_indices[:, k]
+                expert_weights = top_k_weights[:, k].unsqueeze(1)
+                
+                # A trick to select the right expert for each token in a vectorized way
+                for expert_idx in range(self.experts_per_group):
+                    expert_mask = (expert_indices == expert_idx)
+                    if not expert_mask.any():
+                        continue
+                    
+                    selected_tokens = tokens_for_group[expert_mask]
+                    expert_output = group['experts'][expert_idx](selected_tokens)
+                    group_output[expert_mask] += expert_output * expert_weights[expert_mask]
+
+            # Place the computed outputs back into the final tensor
+            final_output[mask] = group_output
+            
+        return final_output, total_aux_loss
+
 
 class MixtureOfExperts(nn.Module):
     """
@@ -547,7 +664,7 @@ def create_qa_pairs(text, chunk_size=200):
     return qa_pairs
 
 def train_model(model, train_loader, val_loader, epochs=10):
-    """Train the model"""
+    """Train the model, handling the auxiliary loss for H-MoE."""
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     
@@ -557,18 +674,29 @@ def train_model(model, train_loader, val_loader, epochs=10):
     progress_bar = st.progress(0)
     status_text = st.empty()
     
+    # Check if the model is our powerful H-MoE
+    is_hmoe = isinstance(model, HierarchicalMixtureOfExperts)
+
     for epoch in range(epochs):
-        # Training
         model.train()
         train_loss = 0
         for batch_idx, (data, target) in enumerate(train_loader):
             optimizer.zero_grad()
-            output = model(data)
+            
+            # --- CRITICAL CHANGE HERE ---
+            aux_loss = 0
+            if is_hmoe:
+                output, aux_loss = model(data)
+            else:
+                output = model(data) # For all other models
+            
             target = target.squeeze()
-            loss = criterion(output, target)
-            loss.backward()
+            main_loss = criterion(output, target)
+            total_loss = main_loss + aux_loss # Add the load balancing loss
+            
+            total_loss.backward()
             optimizer.step()
-            train_loss += loss.item()
+            train_loss += main_loss.item() # We only track the main loss for consistency
         
         # Validation
         model.eval()
@@ -577,7 +705,11 @@ def train_model(model, train_loader, val_loader, epochs=10):
         total = 0
         with torch.no_grad():
             for data, target in val_loader:
-                output = model(data)
+                if is_hmoe:
+                    output, _ = model(data) # Ignore aux_loss during validation
+                else:
+                    output = model(data)
+                
                 target = target.squeeze()
                 val_loss += criterion(output, target).item()
                 pred = output.argmax(dim=1)
@@ -690,7 +822,7 @@ def main():
         
         architecture = st.selectbox(
             "🏗️ Choose Architecture",
-            ["Mixture of Experts (MoE)", "Simple Transformer", "CNN", "LSTM", "MLP"],
+            ["Hierarchical MoE (Advanced)","Mixture of Experts (MoE)", "Simple Transformer", "CNN", "LSTM", "MLP"],
             help="Select your neural network architecture"
         )
         
@@ -835,8 +967,11 @@ def main():
                         
                         # Create model based on selection
                         st.markdown(f"### 🏗️ Constructing {architecture}...")
-                        
-                        if architecture == "Mixture of Experts (MoE)":
+
+
+                        if architecture == "Hierarchical MoE (Advanced)":
+                            model = HierarchicalMixtureOfExperts(input_dim, hidden_dim, output_dim, num_expert_groups=3, experts_per_group=4, top_k=2)              
+                        elif architecture == "Mixture of Experts (MoE)":
                             model = MixtureOfExperts(input_dim, hidden_dim, output_dim)
                         elif architecture == "Simple Transformer":
                             model = SimpleTransformer(input_dim, hidden_dim, output_dim)
@@ -955,9 +1090,15 @@ def main():
                         question_tensor = torch.FloatTensor(question_features)
                         
                         # Get prediction
+                        # Get prediction
                         model.eval()
                         with torch.no_grad():
-                            output = model(question_tensor)
+                            # Check if the model is the advanced H-MoE, which returns two values
+                            if isinstance(model, HierarchicalMixtureOfExperts):
+                                output, _ = model(question_tensor) # We only need the output, not the loss
+                            else:
+                                output = model(question_tensor) # Original behavior for all other models
+                            
                             predicted_class = output.argmax(dim=1).item()
                             confidence = torch.softmax(output, dim=1).max().item()
                         
