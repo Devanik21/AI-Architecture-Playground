@@ -889,6 +889,36 @@ def main():
         
         # Status indicators
         st.markdown("### 📊 System Status")
+        # --- NEW DYNAMIC STATUS PANEL ---
+        
+        # Check the state of the data and models
+        data_loaded = bool(st.session_state.get('qa_data'))
+        models_trained = bool(st.session_state.get('trained_models'))
+
+        # Set status indicators based on the state
+        data_status_text = "🟢 Data Core: Online" if data_loaded else "⚪ Data Core: Offline"
+        engine_status_text = "🔵 Neural Engine: Active" if models_trained else "⚪ Neural Engine: Idle"
+
+        # Display the status indicators
+        st.markdown(f"**{data_status_text}**")
+        st.markdown(f"**{engine_status_text}**")
+        
+        st.markdown("---") # Adds a visual separator
+
+        # Display key metrics in columns if data is loaded
+        if data_loaded:
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Training Samples", len(st.session_state.qa_data))
+            if models_trained:
+                with col2:
+                    st.metric("Trained Models", len(st.session_state.trained_models))
+        else:
+            st.info("Upload PDF data to begin analysis.", icon="📁")
+
+        # --- END OF NEW PANEL ---
+
+    
         
     # Initialize session state
     if 'trained_models' not in st.session_state:
