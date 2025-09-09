@@ -1,4 +1,4 @@
-import streamlit as st
+5import streamlit as st
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -355,46 +355,71 @@ class TextDataset(Dataset):
         return torch.FloatTensor(self.features[idx]), torch.LongTensor([self.targets[idx]])
 
 # Mixture of Experts Model
+# Mixture of Experts Model
 class Expert(nn.Module):
+    """A deeper, more capable expert network."""
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(Expert, self).__init__()
         self.network = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(hidden_dim, output_dim)
+            nn.Dropout(0.3),
+            nn.Linear(hidden_dim, hidden_dim // 2),  # Additional hidden layer
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(hidden_dim // 2, output_dim)
         )
     
     def forward(self, x):
         return self.network(x)
 
 class MixtureOfExperts(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, num_experts=4):
+    """
+    An advanced Mixture of Experts model with a deeper gating network 
+    and Top-K routing for improved specialization and accuracy.
+    """
+    def __init__(self, input_dim, hidden_dim, output_dim, num_experts=4, top_k=2):
         super(MixtureOfExperts, self).__init__()
         self.num_experts = num_experts
+        self.top_k = top_k
+        
+        # Create a list of expert models
         self.experts = nn.ModuleList([
             Expert(input_dim, hidden_dim, output_dim) for _ in range(num_experts)
         ])
+        
+        # Create a deeper gating network for smarter routing
         self.gating = nn.Sequential(
-            nn.Linear(input_dim, num_experts),
-            nn.Softmax(dim=1)
+            nn.Linear(input_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim // 2, num_experts)
         )
     
     def forward(self, x):
-        # Get gating weights
-        gate_weights = self.gating(x)  # [batch_size, num_experts]
+        # 1. Get raw scores (logits) from the gating network
+        gate_logits = self.gating(x)  # Shape: [batch_size, num_experts]
         
-        # Get expert outputs
-        expert_outputs = []
-        for expert in self.experts:
-            expert_outputs.append(expert(x))
+        # 2. Find the top-k experts and their corresponding scores
+        # We use torch.topk to select the best experts for each item in the batch
+        top_k_weights, top_k_indices = torch.topk(gate_logits, self.top_k, dim=1) # Shape: [batch_size, top_k]
         
-        # Stack expert outputs
-        expert_outputs = torch.stack(expert_outputs, dim=2)  # [batch_size, output_dim, num_experts]
+        # 3. Normalize the scores of the selected experts using Softmax
+        top_k_weights = nn.functional.softmax(top_k_weights, dim=1)
         
-        # Apply gating weights
-        gate_weights = gate_weights.unsqueeze(1)  # [batch_size, 1, num_experts]
-        output = torch.sum(expert_outputs * gate_weights, dim=2)  # [batch_size, output_dim]
+        # 4. Get the outputs from all experts
+        expert_outputs = torch.stack([expert(x) for expert in self.experts], dim=2) # Shape: [batch_size, output_dim, num_experts]
+
+        # 5. Create a sparse tensor for the final gating weights
+        # This tensor will have zeros for the experts that were not selected
+        final_gate_weights = torch.zeros_like(gate_logits) # Shape: [batch_size, num_experts]
+        final_gate_weights.scatter_(1, top_k_indices, top_k_weights) # Fill with top-k weights
+
+        # 6. Combine the expert outputs using the sparse weights
+        # We unsqueeze the weights to match dimensions for broadcasting
+        final_gate_weights = final_gate_weights.unsqueeze(1) # Shape: [batch_size, 1, num_experts]
+        
+        # The final output is a weighted sum of the expert outputs
+        output = torch.sum(expert_outputs * final_gate_weights, dim=2) # Shape: [batch_size, output_dim]
         
         return output
 
