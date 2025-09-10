@@ -45,10 +45,7 @@ st.markdown("""
         --border-color: #2d3748;
     }
     
-    /* Hide default Streamlit styling */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+
     
     /* Main app background */
     .stApp {
