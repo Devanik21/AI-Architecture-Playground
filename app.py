@@ -765,7 +765,7 @@ def create_qa_pairs(text, chunk_size=200):
     return qa_pairs
 
 def train_model(model, train_loader, val_loader, epochs=10):
-    """Train the model, handling the auxiliary loss for H-MoE."""
+    """Train the model, handling the auxiliary loss for H-MoE and HAG-MoE."""
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     
@@ -775,8 +775,9 @@ def train_model(model, train_loader, val_loader, epochs=10):
     progress_bar = st.progress(0)
     status_text = st.empty()
     
-    # Check if the model is our powerful H-MoE
-    is_hmoe = isinstance(model, HierarchicalMixtureOfExperts)
+    # --- THIS IS THE CORRECTED LINE ---
+    # Check if the model is one of the complex types that returns an auxiliary loss
+    is_complex_moe = isinstance(model, (HierarchicalMixtureOfExperts, HAGMoE))
 
     for epoch in range(epochs):
         model.train()
@@ -784,9 +785,8 @@ def train_model(model, train_loader, val_loader, epochs=10):
         for batch_idx, (data, target) in enumerate(train_loader):
             optimizer.zero_grad()
             
-            # --- CRITICAL CHANGE HERE ---
             aux_loss = 0
-            if is_hmoe:
+            if is_complex_moe:
                 output, aux_loss = model(data)
             else:
                 output = model(data) # For all other models
@@ -806,7 +806,7 @@ def train_model(model, train_loader, val_loader, epochs=10):
         total = 0
         with torch.no_grad():
             for data, target in val_loader:
-                if is_hmoe:
+                if is_complex_moe:
                     output, _ = model(data) # Ignore aux_loss during validation
                 else:
                     output = model(data)
@@ -820,9 +820,6 @@ def train_model(model, train_loader, val_loader, epochs=10):
         train_loss /= len(train_loader)
         val_loss /= len(val_loader)
         accuracy = 100. * correct / total
-        
-        train_losses.append(train_loss)
-        val_losses.append(val_loss)
         
         progress_bar.progress((epoch + 1) / epochs)
         status_text.markdown(f'**Epoch {epoch+1}/{epochs}** | Train Loss: `{train_loss:.4f}` | Val Loss: `{val_loss:.4f}` | Accuracy: `{accuracy:.2f}%`')
