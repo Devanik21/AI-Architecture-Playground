@@ -773,7 +773,6 @@ def display_architecture_info(architecture):
                 "<strong>Residual Experts:</strong> Each expert is a powerful residual block for stable, deep learning."
             ]
         },
-
         "HAG-MoE (Hybrid)": {
             "emoji": "🌌",
             "description": "A new paradigm that embeds expert selection directly into the attention mechanism, orchestrating experts across a three-level hierarchy.",
