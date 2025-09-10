@@ -1307,13 +1307,16 @@ def main():
                         model.eval()
                         with torch.no_grad():
                             # Check if the model is the advanced H-MoE, which returns two values
-                            if isinstance(model, HierarchicalMixtureOfExperts):
-                                output, _ = model(question_tensor) # We only need the output, not the loss
+                            model_output = model(question_tensor)
+                            if isinstance(model_output, tuple):
+                                output_tensor = model_output[0]
                             else:
-                                output = model(question_tensor) # Original behavior for all other models
-                            
-                            predicted_class = output.argmax(dim=1).item()
-                            confidence = torch.softmax(output, dim=1).max().item()
+                                output_tensor = model_output
+
+                            predicted_class = output_tensor.argmax(dim=1).item()
+                            confidence = torch.softmax(output_tensor, dim=1).max().item()
+
+                        
                         
                         # Find similar content
                         relevant_qa = [qa for qa in st.session_state.qa_data if qa['label'] == predicted_class]
