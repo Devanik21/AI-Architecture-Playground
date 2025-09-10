@@ -44,7 +44,6 @@ st.markdown("""
         --text-secondary: #a0a9c0;
         --border-color: #2d3748;
     }
-    
 
     
     /* Main app background */
@@ -487,110 +486,6 @@ class HierarchicalMixtureOfExperts(nn.Module):
         return final_output, total_aux_loss
 
 
-
-
-class HAGMoE(nn.Module):
-    """
-    A practical implementation of the Hierarchical Attention-Gated Mixture of Experts (HAG-MoE) concept.
-    This model uses a three-level routing hierarchy to delegate tasks from general to highly specialized experts.
-    It is designed to be a more complex and potentially more powerful version of the H-MoE model.
-    """
-    def __init__(self, input_dim, hidden_dim, output_dim, 
-                 meta_groups=2, macro_groups_per_meta=3, micro_experts_per_macro=4, 
-                 top_k=2, load_balancing_alpha=0.01):
-        super(HAGMoE, self).__init__()
-
-        self.meta_groups = meta_groups
-        self.macro_groups_per_meta = macro_groups_per_meta
-        self.micro_experts_per_macro = micro_experts_per_macro
-        self.top_k = top_k
-        self.load_balancing_alpha = load_balancing_alpha
-
-        # --- Define the 3-Level Hierarchy ---
-
-        # Level 3: Meta-Experts (Conceptual Level)
-        # This top-level router decides which high-level "conceptual domain" to use.
-        self.meta_router = nn.Linear(input_dim, self.meta_groups)
-
-        # Level 2: Macro-Experts (Sequence/Task Level)
-        # Each meta-group has its own set of macro-routers.
-        self.macro_routers = nn.ModuleList()
-        for _ in range(self.meta_groups):
-            self.macro_routers.append(
-                nn.Linear(input_dim, self.macro_groups_per_meta)
-            )
-
-        # Level 1: Micro-Experts (Token/Pattern Level)
-        # The final, specialized experts that perform the actual computation.
-        num_macro_groups_total = self.meta_groups * self.macro_groups_per_meta
-        self.micro_expert_groups = nn.ModuleList()
-        for _ in range(num_macro_groups_total):
-            self.micro_expert_groups.append(
-                nn.ModuleList([Expert(input_dim, hidden_dim, output_dim) for _ in range(self.micro_experts_per_macro)])
-            )
-
-    def _calculate_load_balancing_loss(self, router_logits):
-        """Calculates the auxiliary loss to encourage router to use all experts."""
-        router_probs = torch.softmax(router_logits, dim=1)
-        fraction_of_tokens = router_probs.mean(0)
-        mean_prob = router_probs.mean(0)
-        loss = self.load_balancing_alpha * router_logits.size(1) * torch.sum(fraction_of_tokens * mean_prob)
-        return loss
-
-    def forward(self, x):
-        batch_size = x.size(0)
-        final_output = torch.zeros(batch_size, self.micro_expert_groups[0][0].fc3.out_features, device=x.device)
-        total_aux_loss = 0
-
-        # --- Level 3 Routing ---
-        meta_logits = self.meta_router(x)
-        _, top_meta_indices = torch.topk(meta_logits, 1, dim=1)
-        top_meta_indices = top_meta_indices.squeeze(1)
-        total_aux_loss += self._calculate_load_balancing_loss(meta_logits)
-
-        # Iterate through each meta-group
-        for meta_idx in range(self.meta_groups):
-            meta_mask = (top_meta_indices == meta_idx)
-            if not meta_mask.any():
-                continue
-            
-            tokens_for_meta = x[meta_mask]
-            
-            # --- Level 2 Routing ---
-            macro_router = self.macro_routers[meta_idx]
-            macro_logits = macro_router(tokens_for_meta)
-            _, top_macro_indices = torch.topk(macro_logits, 1, dim=1)
-            top_macro_indices = top_macro_indices.squeeze(1)
-            total_aux_loss += self._calculate_load_balancing_loss(macro_logits)
-            
-            # Iterate through each macro-group within the current meta-group
-            for macro_idx in range(self.macro_groups_per_meta):
-                macro_mask = (top_macro_indices == macro_idx)
-                if not macro_mask.any():
-                    continue
-
-                tokens_for_macro = tokens_for_meta[macro_mask]
-                
-                # --- Level 1 Expert Execution ---
-                # We map the meta/macro indices to the flat list of micro-expert groups
-                micro_group_idx = meta_idx * self.macro_groups_per_meta + macro_idx
-                micro_experts = self.micro_expert_groups[micro_group_idx]
-                
-                # We don't need a third router; the final output is a blend of all micro-experts in the chosen group
-                # This is a simplification of the 'attention-gating' for practical use
-                expert_outputs = [expert(tokens_for_macro) for expert in micro_experts]
-                stacked_outputs = torch.stack(expert_outputs, dim=1)
-                
-                # Average the outputs of all experts in the final chosen group
-                final_micro_output = torch.mean(stacked_outputs, dim=1)
-                
-                # To place results correctly, we need to map from the macro_mask back to the original batch
-                original_indices = meta_mask.nonzero().squeeze(1)[macro_mask.nonzero().squeeze(1)]
-                final_output[original_indices] = final_micro_output
-
-        return final_output, total_aux_loss
-
-
 class MixtureOfExperts(nn.Module):
     """
     An advanced Mixture of Experts model with a deeper gating network 
@@ -765,7 +660,7 @@ def create_qa_pairs(text, chunk_size=200):
     return qa_pairs
 
 def train_model(model, train_loader, val_loader, epochs=10):
-    """Train the model, handling the auxiliary loss for H-MoE and HAG-MoE."""
+    """Train the model, handling the auxiliary loss for H-MoE."""
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     
@@ -775,9 +670,8 @@ def train_model(model, train_loader, val_loader, epochs=10):
     progress_bar = st.progress(0)
     status_text = st.empty()
     
-    # --- THIS IS THE CORRECTED LINE ---
-    # Check if the model is one of the complex types that returns an auxiliary loss
-    is_complex_moe = isinstance(model, (HierarchicalMixtureOfExperts, HAGMoE))
+    # Check if the model is our powerful H-MoE
+    is_hmoe = isinstance(model, HierarchicalMixtureOfExperts)
 
     for epoch in range(epochs):
         model.train()
@@ -785,8 +679,9 @@ def train_model(model, train_loader, val_loader, epochs=10):
         for batch_idx, (data, target) in enumerate(train_loader):
             optimizer.zero_grad()
             
+            # --- CRITICAL CHANGE HERE ---
             aux_loss = 0
-            if is_complex_moe:
+            if is_hmoe:
                 output, aux_loss = model(data)
             else:
                 output = model(data) # For all other models
@@ -806,7 +701,7 @@ def train_model(model, train_loader, val_loader, epochs=10):
         total = 0
         with torch.no_grad():
             for data, target in val_loader:
-                if is_complex_moe:
+                if is_hmoe:
                     output, _ = model(data) # Ignore aux_loss during validation
                 else:
                     output = model(data)
@@ -820,6 +715,9 @@ def train_model(model, train_loader, val_loader, epochs=10):
         train_loss /= len(train_loader)
         val_loss /= len(val_loader)
         accuracy = 100. * correct / total
+        
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
         
         progress_bar.progress((epoch + 1) / epochs)
         status_text.markdown(f'**Epoch {epoch+1}/{epochs}** | Train Loss: `{train_loss:.4f}` | Val Loss: `{val_loss:.4f}` | Accuracy: `{accuracy:.2f}%`')
@@ -872,18 +770,6 @@ def display_architecture_info(architecture):
                 "<strong>Hierarchical Routing:</strong> Delegates tasks from a meta-router to specialized expert groups.",
                 "<strong>Load Balancing:</strong> Actively prevents expert overuse, ensuring full model capacity is utilized.",
                 "<strong>Residual Experts:</strong> Each expert is a powerful residual block for stable, deep learning."
-            ]
-        },
-        # --- NEW HYBRID ARCHITECTURE ADDED HERE ---
-        "HAG-MoE (Hybrid)": {
-            "emoji": "🌌",
-            "description": "A new paradigm that embeds expert selection directly into the attention mechanism, orchestrating experts across a three-level hierarchy.",
-            "color": "#20c997", # A vibrant teal
-            "details": [
-                "<strong>Attention-Gated Experts:</strong> Expert activation is determined by attention-modulated weights, creating a fluid, context-aware selection mechanism.",
-                "<strong>Three-Level Hierarchy:</strong> Decomposes tasks across token-level (micro), sequence-level (macro), and conceptual (meta) experts.",
-                "<strong>Dynamic Orchestration (DEO):</strong> A temporal gating mechanism that considers expert usage history to ensure balanced utilization.",
-                "<strong>Proven Convergence:</strong> Backed by the Expert Convergence Theorem, providing a mathematical guarantee of performance."
             ]
         },
         "Mixture of Experts (MoE)": {
@@ -984,7 +870,7 @@ def main():
         
         architecture = st.selectbox(
             "🏗️ Choose Architecture",
-            ["Hierarchical MoE (Advanced)","HAG-MoE (Hybrid)","Mixture of Experts (MoE)", "Simple Transformer", "CNN", "LSTM", "MLP"],
+            ["Hierarchical MoE (Advanced)","Mixture of Experts (MoE)", "Simple Transformer", "CNN", "LSTM", "MLP"],
             help="Select your neural network architecture"
         )
         
@@ -1140,23 +1026,9 @@ def main():
                         # --- FIX ENDS HERE ---
                         
                         # Create dataset
-                        # Create dataset
                         train_texts, val_texts, train_labels, val_labels = train_test_split(
                             texts, labels, test_size=0.2, random_state=42
                         )
-
-                        # --- NEW VALIDATION CHECK TO PREVENT CRASH ---
-                        if not train_texts or not val_texts:
-                            st.error(
-                                f"❌ Insufficient data for training and validation split. "
-                                f"The PDF produced only {len(texts)} sample(s), which is not enough. "
-                                "Please use a larger or more text-rich PDF."
-                            )
-                            st.stop() # Stop execution
-                        # --- END OF NEW CHECK ---
-
-                        train_dataset = TextDataset(train_texts, train_labels)
-                        val_dataset = TextDataset(val_texts, val_labels, train_dataset.vectorizer)
                         
                         train_dataset = TextDataset(train_texts, train_labels)
                         val_dataset = TextDataset(val_texts, val_labels, train_dataset.vectorizer)
@@ -1172,10 +1044,7 @@ def main():
 
 
                         if architecture == "Hierarchical MoE (Advanced)":
-                            model = HierarchicalMixtureOfExperts(input_dim, hidden_dim, output_dim, num_expert_groups=3, experts_per_group=4, top_k=2)
-                        elif architecture == "HAG-MoE (Hybrid)":
-                            st.info("Initializing HAG-MoE... This is the most complex model and may require more memory.", icon="🌌")
-                            model = HAGMoE(input_dim, hidden_dim, output_dim)
+                            model = HierarchicalMixtureOfExperts(input_dim, hidden_dim, output_dim, num_expert_groups=3, experts_per_group=4, top_k=2)              
                         elif architecture == "Mixture of Experts (MoE)":
                             model = MixtureOfExperts(input_dim, hidden_dim, output_dim)
                         elif architecture == "Simple Transformer":
