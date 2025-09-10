@@ -1140,9 +1140,23 @@ def main():
                         # --- FIX ENDS HERE ---
                         
                         # Create dataset
+                        # Create dataset
                         train_texts, val_texts, train_labels, val_labels = train_test_split(
                             texts, labels, test_size=0.2, random_state=42
                         )
+
+                        # --- NEW VALIDATION CHECK TO PREVENT CRASH ---
+                        if not train_texts or not val_texts:
+                            st.error(
+                                f"❌ Insufficient data for training and validation split. "
+                                f"The PDF produced only {len(texts)} sample(s), which is not enough. "
+                                "Please use a larger or more text-rich PDF."
+                            )
+                            st.stop() # Stop execution
+                        # --- END OF NEW CHECK ---
+
+                        train_dataset = TextDataset(train_texts, train_labels)
+                        val_dataset = TextDataset(val_texts, val_labels, train_dataset.vectorizer)
                         
                         train_dataset = TextDataset(train_texts, train_labels)
                         val_dataset = TextDataset(val_texts, val_labels, train_dataset.vectorizer)
