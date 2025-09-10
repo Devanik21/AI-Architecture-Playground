@@ -686,7 +686,7 @@ def train_model(model, train_loader, val_loader, epochs=10):
             else:
                 output = model(data) # For all other models
             
-            target = target.squeeze()
+            target = target.squeeze(1)
             main_loss = criterion(output, target)
             total_loss = main_loss + aux_loss # Add the load balancing loss
             
@@ -706,7 +706,7 @@ def train_model(model, train_loader, val_loader, epochs=10):
                 else:
                     output = model(data)
                 
-                target = target.squeeze()
+                target = target.squeeze(1)
                 val_loss += criterion(output, target).item()
                 pred = output.argmax(dim=1)
                 total += target.size(0)
