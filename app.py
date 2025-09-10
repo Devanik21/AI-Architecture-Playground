@@ -1209,23 +1209,31 @@ def main():
                         
                         st.success("✅ Neural training completed successfully!")
                         
-                        # Plot results
-                        st.markdown("### 📈 Training Performance Analysis")
-                        fig = plot_training_curves(train_losses, val_losses)
-                        st.pyplot(fig)
-                        
-                        # Final metrics
-                        final_train_loss = train_losses[-1]
-                        final_val_loss = val_losses[-1]
-                        
-                        metric_col1, metric_col2, metric_col3 = st.columns(3)
-                        with metric_col1:
-                            st.metric("🎯 Final Train Loss", f"{final_train_loss:.4f}")
-                        with metric_col2:
-                            st.metric("🎯 Final Val Loss", f"{final_val_loss:.4f}")
-                        with metric_col3:
-                            improvement = ((train_losses[0] - final_train_loss) / train_losses[0] * 100)
-                            st.metric("📈 Improvement", f"{improvement:.1f}%")
+                        # Add a check to ensure training produced results before analysis
+                        if train_losses and val_losses:
+                            # Plot results
+                            st.markdown("### 📈 Training Performance Analysis")
+                            fig = plot_training_curves(train_losses, val_losses)
+                            st.pyplot(fig)
+                            
+                            # Final metrics
+                            final_train_loss = train_losses[-1]
+                            final_val_loss = val_losses[-1]
+                            
+                            metric_col1, metric_col2, metric_col3 = st.columns(3)
+                            with metric_col1:
+                                st.metric("🎯 Final Train Loss", f"{final_train_loss:.4f}")
+                            with metric_col2:
+                                st.metric("🎯 Final Val Loss", f"{final_val_loss:.4f}")
+                            with metric_col3:
+                                # Also check if there's more than one epoch to calculate improvement
+                                if len(train_losses) > 1:
+                                    improvement = ((train_losses[0] - final_train_loss) / train_losses[0] * 100)
+                                    st.metric("📈 Improvement", f"{improvement:.1f}%")
+                                else:
+                                    st.metric("📈 Improvement", "N/A")
+                        else:
+                            st.warning("⚠️ Training completed, but no metrics were generated. This can happen with very small datasets or if epochs are set to zero.")
             
             with col2:
                 st.markdown("""
