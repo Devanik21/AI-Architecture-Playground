@@ -773,6 +773,18 @@ def display_architecture_info(architecture):
                 "<strong>Residual Experts:</strong> Each expert is a powerful residual block for stable, deep learning."
             ]
         },
+
+        "HAG-MoE (Hybrid)": {
+            "emoji": "🌌",
+            "description": "A new paradigm that embeds expert selection directly into the attention mechanism, orchestrating experts across a three-level hierarchy.",
+            "color": "#20c997", # A vibrant teal
+            "details": [
+                "<strong>Attention-Gated Experts:</strong> Expert activation is determined by attention-modulated weights, creating a fluid, context-aware selection mechanism.",
+                "<strong>Three-Level Hierarchy:</strong> Decomposes tasks across token-level (micro), sequence-level (macro), and conceptual (meta) experts.",
+                "<strong>Dynamic Orchestration (DEO):</strong> A temporal gating mechanism that considers expert usage history to ensure balanced utilization.",
+                "<strong>Proven Convergence:</strong> Backed by the Expert Convergence Theorem, providing a mathematical guarantee of performance."
+            ]
+        },
         "Mixture of Experts (MoE)": {
             "emoji": "🧠",
             "description": "An advanced ensemble where a gating network routes data to the most suitable specialized neural network.",
